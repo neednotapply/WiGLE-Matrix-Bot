@@ -6,6 +6,7 @@ import logging
 import inflect
 import time
 from datetime import datetime
+import os
 
 logging.basicConfig(level=logging.INFO)
 
@@ -26,20 +27,40 @@ def load_config():
 config = load_config()
 matrix_homeserver = config["matrix_homeserver"]
 matrix_user_id = config["matrix_user_id"]
-matrix_access_token = config["matrix_access_token"]
+matrix_password = config["matrix_password"]
 wigle_api_key = config["wigle_api_key"]
 
 class WigleBot:
     def __init__(self):
-        self.client = nio.AsyncClient(matrix_homeserver, matrix_user_id)
+        self.store_path = "store/"  # Path to store sync tokens and other state
+        self.client = nio.AsyncClient(
+            matrix_homeserver,
+            matrix_user_id,
+            store_path=self.store_path
+        )
         self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60))
         self.wigle_api_key = wigle_api_key
         self.command_prefix = "!"  # Define a command prefix for bot commands
 
     async def start(self):
-        self.client.access_token = matrix_access_token
+        # Create the store directory if it doesn't exist
+        if not os.path.exists(self.store_path):
+            os.makedirs(self.store_path)
+
+        # Log in with username and password
+        logging.info("Logging in with username and password.")
+        login_response = await self.client.login(matrix_password)
+        if isinstance(login_response, nio.LoginError):
+            logging.error(f"Failed to log in: {login_response.message}")
+            return
+        else:
+            logging.info("Login successful.")
+
         self.client.add_event_callback(self.message_callback, nio.RoomMessageText)
-        await self.client.sync_forever(timeout=30000)  # Sync every 30 seconds
+        self.client.add_event_callback(self.invite_callback, nio.InviteEvent)
+
+        # Start syncing with the server
+        await self.client.sync_forever(timeout=30000)
 
     async def close(self):
         await self.session.close()
@@ -47,7 +68,7 @@ class WigleBot:
 
     async def message_callback(self, room, event):
         # Ignore messages from ourselves
-        if event.sender == self.client.user:
+        if event.sender == self.client.user_id:
             return
 
         # Check if the message is a command
@@ -63,8 +84,8 @@ class WigleBot:
                 await self.send_typing_notice(room.room_id)
                 response = await self.fetch_wigle_user_stats(username)
                 if "success" in response and response["success"]:
-                    embed = self.create_user_embed(response)
-                    await self.send_message(room.room_id, embed)
+                    message = self.create_user_message(response)
+                    await self.send_message(room.room_id, message)
                 else:
                     error_message = response.get("message", "Failed to fetch user stats.")
                     logging.warning(f"WiGLE user stats fetch error for {username}: {error_message}")
@@ -81,7 +102,7 @@ class WigleBot:
                     logging.warning(f"WiGLE group rank fetch error: {error_message}")
                     await self.send_message(room.room_id, error_message)
             elif command == "userrank" and args:
-                group = args[0]
+                group = " ".join(args)
                 logging.info(f"Command 'userrank' invoked for group: {group}")
                 await self.send_typing_notice(room.room_id)
                 response = await self.fetch_wigle_id(group)
@@ -129,22 +150,24 @@ class WigleBot:
                 await self.send_message(room.room_id, "Unknown command. Type !help for available commands.")
 
     async def send_message(self, room_id, message):
+        content = {
+            "msgtype": "m.text",
+            "body": message
+        }
         await self.client.room_send(
             room_id,
             message_type="m.room.message",
-            content={
-                "msgtype": "m.text",
-                "body": message
-            }
+            content=content
         )
 
     async def send_typing_notice(self, room_id):
         await self.client.room_typing(room_id, timeout=3000)
 
-    # Implement the methods for fetching WiGLE data (same as your original code)
+    async def invite_callback(self, room, event):
+        await self.client.join(room.room_id)
+        logging.info(f"Joined room {room.room_id}")
 
     async def fetch_wigle_user_stats(self, username: str):
-        # ... (Same as your original code)
         timestamp = int(time.time())
         req = f"https://api.wigle.net/api/v2/stats/user?user={username}&nocache={timestamp}"
         headers = {
@@ -178,7 +201,6 @@ class WigleBot:
             return {"success": False, "message": str(e)}
 
     async def fetch_wigle_group_rank(self):
-        # ... (Same as your original code)
         timestamp = int(time.time())
         req = f"https://api.wigle.net/api/v2/stats/group?nocache={timestamp}"
         headers = {
@@ -201,7 +223,6 @@ class WigleBot:
             return {"success": False, "message": str(e)}
 
     async def fetch_wigle_id(self, group_name: str):
-        # ... (Same as your original code)
         timestamp = int(time.time())
         req = f"https://api.wigle.net/api/v2/stats/group?nocache={timestamp}"
         headers = {
@@ -215,10 +236,10 @@ class WigleBot:
                     return {"success": False, "message": f"HTTP error {response.status}"}
 
                 data = await response.json()
-                if "success" in data:
+                if data.get("success"):
                     groups = data.get("groups", [])
                     for group in groups:
-                        if group["groupName"] == group_name:
+                        if group["groupName"].lower() == group_name.lower():
                             group_id = group["groupId"]
                             url = f"https://api.wigle.net/api/v2/group/groupMembers?groupid={group_id}"
                             return {"success": True, "groupId": group_id, "url": url}
@@ -233,7 +254,11 @@ class WigleBot:
 
     async def fetch_user_rank(self, url: str):
         try:
-            async with self.session.get(url) as response:
+            headers = {
+                "Authorization": f"Basic {self.wigle_api_key}",
+                "Cache-Control": "no-cache",
+            }
+            async with self.session.get(url, headers=headers) as response:
                 if response.status != 200:
                     logging.error(f"Error fetching user rank from URL: {url}, HTTP error {response.status}")
                     return None
@@ -245,7 +270,6 @@ class WigleBot:
             return None
 
     async def fetch_wigle_alltime_rank(self):
-        # ... (Same as your original code)
         req = f"https://api.wigle.net/api/v2/stats/standings?sort=discovered&pagestart=0"
         headers = {
             "Authorization": f"Basic {self.wigle_api_key}",
@@ -268,7 +292,6 @@ class WigleBot:
             return {"success": False, "message": str(e)}
 
     async def fetch_wigle_month_rank(self):
-        # ... (Same as your original code)
         req = f"https://api.wigle.net/api/v2/stats/standings?sort=monthcount&pagestart=0"
         headers = {
             "Authorization": f"Basic {self.wigle_api_key}",
@@ -290,10 +313,7 @@ class WigleBot:
             logging.error(f"Failed to fetch WiGLE monthly ranking: {e}")
             return {"success": False, "message": str(e)}
 
-    # Helper methods to format messages
-
-    def create_user_embed(self, response):
-        # Since Matrix doesn't support embeds like Discord, we'll format the message as plain text
+    def create_user_message(self, response):
         statistics = response["statistics"]
         username = response["user"]
         rank = response["rank"]
