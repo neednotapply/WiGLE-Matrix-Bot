@@ -1,6 +1,6 @@
 {
     "matrix_homeserver": "https://matrix.org",
     "matrix_user_id": "@yourbot:matrix.org",
-    "matrix_access_token": "YOUR_MATRIX_ACCESS_TOKEN",
+    "matrix_password": "YOUR_MATRIX_PASSWORD",
     "wigle_api_key": "YOUR_WIGLE_API_KEY"
 }
