@@ -16,14 +16,16 @@ Prior to using the bot the following variables must be changed in the `config.js
 
 ## Commands
 Once the above variables have been updated, run the bot using the following commands:
-- `/user` followed by a username to get user stats. For example, `/user neednotapply`.
-- `/userrank` followed by a group name to get user rankings for that group. For example, `/userrank #wardriving`.
-- `/grouprank` to show group rankings.
-- `/alltime` for all-time user rankings.
-- `/monthly` for monthly user rankings.
-- `/help` to show a list of available bot commands.
+- `!user` followed by a username to get user stats. For example, `/user neednotapply`.
+- `!userrank` followed by a group name to get user rankings for that group. For example, `/userrank #wardriving`.
+- `!grouprank` to show group rankings.
+- `!alltime` for all-time user rankings.
+- `!monthly` for monthly user rankings.
+- `!help` to show a list of available bot commands.
 
 ## Credits
-Further development of this bot is in collaboration with [RocketGod](https://github.com/RocketGod-git).
+Discord bot created by [Kavitate](https://github.com/Kavitate).  
+Further development of this bot is in collaboration with [RocketGod](https://github.com/RocketGod-git).  
+Modified for Matrix ecosystem by [NeedNotApply](https://github.com/neednotapply).
 
 The idea for this bot was inspired by the [WiGLE Bot Repo](https://github.com/INIT6Source/WiGLE-bot) made by [INIT6Source](https://github.com/INIT6Source).
