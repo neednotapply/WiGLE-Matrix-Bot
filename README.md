@@ -8,7 +8,10 @@ This Matrix bot is used to pull stats from [WiGLE](https://wigle.net/) using WiG
 
 ## Variables
 Prior to using the bot the following variables must be changed in the `config.json` file:
-- Remove the `YOUR-TOKEN-HERE` text and replace it with your Matrix Bot Token.
+- Replace `@your_bot_username:matrix.org` with your Matrix bot's username
+- Replace `your_bot_password` with your Matrix bot's password
+- Adjust the homeserver_url appropriately if the bot will not belong to the default https://matrix.org federation.
+
   - If you do not know how to create a Matrix bot, instructions on how to do so can be found [here](https://matrix-nio.readthedocs.io/en/latest/#)
 - Replace `YOUR-ENCODED-FOR-USE-KEY-HERE` with your WiGLE API Key.
   - Your API key can be found [here](https://api.wigle.net/), select your account page in the lower right, then select "Show My Token".
